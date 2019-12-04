@@ -17,8 +17,11 @@ CORS(app)
 app._verbose = True
 
 import os
-if not os.path.exists('./flask_server_generated_tables'):
-    os.mkdir('./flask_server_generated_tables')
+pwd = os.path.dirname(os.path.abspath(__file__))
+tmpdir = os.path.join(pwd, 'flask_server_generated_tables')
+if not os.path.exists(tmpdir):
+    os.mkdir(tmpdir)
+
 
 
 ################################## ADDITIONAL IMPORTS ##########################
@@ -83,7 +86,7 @@ def _generate_requested_passband(pbr, content_request):
         pb.content = [c for c in content_request]
 
 
-    pbf = tempfile.NamedTemporaryFile(dir='flask_server_generated_tables', prefix=prefix, suffix=".fits")
+    pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
     pb.save(pbf.name)
 
     return pbf, filename
