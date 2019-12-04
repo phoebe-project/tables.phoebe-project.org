@@ -19,6 +19,7 @@ app._verbose = True
 import os
 pwd = os.path.dirname(os.path.abspath(__file__))
 tmpdir = os.path.join(pwd, 'flask_server_generated_tables')
+datadir = os.path.join(pwd, 'data')
 if not os.path.exists(tmpdir):
     os.mkdir(tmpdir)
 
@@ -37,7 +38,7 @@ phoebe.interactive_off()
 def _flush():
     print("flushing passbands cache")
     phoebe.atmospheres.passbands._pbtable = {}
-    phoebe.atmospheres.passbands._init_passbands(refresh=True, query_online=False, passband_directories='./data')
+    phoebe.atmospheres.passbands._init_passbands(refresh=True, query_online=False, passband_directories=datadir)
 
 _flush()
 
