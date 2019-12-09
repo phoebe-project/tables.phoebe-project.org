@@ -49,12 +49,23 @@ def _get_response(data, status_code=200):
     return resp
 
 def _unpack_passband_request(passband_request):
-    if passband_request.lower() == 'all':
-        online_passbands = phoebe.list_installed_passbands()
+    online_passbands = phoebe.list_installed_passbands()
 
+    if passband_request.lower() == 'all':
         return online_passbands
     else:
-        return passband_request.split(",")
+        ret = []
+        # we need to handle logic of ['Johnson', 'Johnson:V', 'Stromgren:V']
+        for pb in passband_request.split(','):
+            if ':' in pb and pb not in ret:
+                ret.append(pb)
+            else:
+                for pbo in online_passbands:
+                    if pbo.split(':')[0] == pb and pbo not in ret:
+                        ret.append(pbo)
+
+        return ret
+
 
 def _unpack_content_request(content_request):
     # if isinstance(passband_request, str):
@@ -62,11 +73,27 @@ def _unpack_content_request(content_request):
 
     if isinstance(content_request, list):
         return content_request
+    elif not (isinstance(content_request, str) or isinstance(content_request, unicode)):
+        raise TypeError("content_request must be of type list or string")
     elif content_request.lower() == 'all':
         return 'all'
-
     else:
+        # note: the individual entries may still contain atm:all... each item
+        # in the returned list will later need to be processed via _expand_content_item
         return content_request.split(",")
+
+def _expand_content_item(pb, cr_item):
+    """
+    cr_item is a single item from this list returned by _unpack_content_request
+    """
+    if cr_item in pb.content:
+        return [cr_item]
+    else:
+        # then we need to handle the chance that cr_item might be an atm
+        atm = cr_item.split(':')[0]
+        c_matches = [c for c in pb.content if c.split(':')[0]==atm]
+        return c_matches
+
 
 def _unpack_version_request(phoebe_version_request):
     if phoebe_version_request == 'latest':
@@ -89,8 +116,16 @@ def _generate_request_passband(pbr, content_request):
         else:
             raise ValueError("pass content_request through _unpack_content_request first")
     else:
-        pb.content = [c for c in content_request]
+        content_return = []
+        for c in content_request:
+            c_expanded = _expand_content_item(pb, c)
+            # if not len(c_expanded):
+            #     raise ValueError("could not find content match for content_request={}".format(c))
+            content_return += c_expanded
 
+        content_return = list(set(content_return))
+        print("serving {} passband with content={}".format(pbr, content_return))
+        pb.content = content_return
 
     pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
     pb.save(pbf.name)
@@ -149,24 +184,42 @@ def pbs_available(phoebe_version_request='latest'):
         print("available")
 
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
-    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed'])
+    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb'])
 
-    available_contents = []
+    available_content = []
     for pb,d in online_passbands.items():
-        for atm in d['atms']:
-            if atm not in available_contents:
-                available_contents.append(atm)
+        for c in d['content']:
+            # in addition to the individual content entries, provide an atm:all
+            # option.  This will be accepted by pbs_generate_and_serve's content_request
+            # via _unpack_content_request and _expand_content_item
+            # atm = c.split(':')[0]
+            # if atm not in available_content:
+            #     available_content.append(atm)
 
+            if c not in available_content:
+                available_content.append(c)
+
+    # NOTE: the returned content items are not guaranteed to exist for each
+    # passband entry, but are a complete list of all available content across
+    # all passbands.  If an item in content does not exist for a given passband
+    # that can be checked via pbs_content or will just be skipped during
+    # pbs_generate_and_serve
+    passbands = sorted(online_passbands.keys())
+    passband_sets = sorted(list(set([pb.split(':')[0] for pb in online_passbands.keys()])))
+    passbands_per_set = {pbs: len([pb for pb in passbands if pb.split(':')[0]==pbs]) for pbs in passband_sets}
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
-                          'passbands': sorted(online_passbands.keys()),
-                          'contents': sorted(available_contents)})
+                          'passbands': passbands,
+                          'passband_sets': passband_sets,
+                          'npassbands_per_set': passbands_per_set,
+                          'content': sorted(available_content),
+                          'content_atms': sorted(list(set([c.split(':')[0] for c in available_content])))})
 
-@app.route('/pbs/contents/<string:passband_request>', methods=['GET'])
-@app.route('/pbs/contents/<string:passband_request>/<string:phoebe_version_request>', methods=['GET'])
-def pbs_contents(passband_request, phoebe_version_request='latest'):
+@app.route('/pbs/content/<string:passband_request>', methods=['GET'])
+@app.route('/pbs/content/<string:passband_request>/<string:phoebe_version_request>', methods=['GET'])
+def pbs_content(passband_request, phoebe_version_request='latest'):
     if app._verbose:
-        print("list_contents_for_passband: {}".format(passband_request))
+        print("pbs_content for passband: {}".format(passband_request))
 
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
@@ -176,7 +229,7 @@ def pbs_contents(passband_request, phoebe_version_request='latest'):
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
-                          'contents': [online_passbands.get(pbr, {}) for pbr in passband_request]})
+                          'content': {pbr: online_passbands.get(pbr, {}).get('content', []) for pbr in passband_request}})
 
 
 # @app.route('/pbs', methods=['GET'])
@@ -214,6 +267,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
 
         return send_file(tbf.name, as_attachment=True, attachment_filename='generated_phoebe_tables.tar.gz')
 
+    # if we're here, then we know we're a list with only one entry
     pbf, pbfname = _generate_request_passband(passband_request[0], content_request)
     created_tmp_files.append(pbf)
 
