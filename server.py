@@ -23,14 +23,16 @@ datadir = os.path.join(pwd, 'data')
 if not os.path.exists(tmpdir):
     os.mkdir(tmpdir)
 
+# disable online passbands to prevent attempting an infinite loop
+os.environ["PHOEBE_ENABLE_ONLINE_PASSBANDS"] = "FALSE"
 
 
 ################################## ADDITIONAL IMPORTS ##########################
 
+import sys
 import phoebe
 import tempfile
 import tarfile
-import sys
 from datetime import datetime
 
 phoebe.interactive_off()
