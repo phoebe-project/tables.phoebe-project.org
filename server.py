@@ -103,7 +103,7 @@ def _unpack_version_request(phoebe_version_request):
     else:
         return phoebe_version_request
 
-def _generate_request_passband(pbr, content_request):
+def _generate_request_passband(pbr, content_request, save=True):
     if app._verbose:
         print("_generate_request_passband {} {}".format(pbr, content_request))
 
@@ -131,10 +131,13 @@ def _generate_request_passband(pbr, content_request):
         print("serving {} passband with content={}".format(pbr, content_return))
         pb.content = content_return
 
-    pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
-    pb.save(pbf.name, update_timestamp=False)
+    if save:
+        pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
+        pb.save(pbf.name, update_timestamp=False)
 
-    return pbf, filename
+        return pbf, filename
+    else:
+        return pb
 
 @app.route('/favicon.ico', methods=['GET'])
 def favicon():
@@ -237,12 +240,37 @@ def pbs_content(passband_request, phoebe_version_request='latest'):
 
 
 # @app.route('/pbs', methods=['GET'])
+@app.route('/pbs/unpack_request/<string:passband_request>', methods=['GET'])
+@app.route('/pbs/unpack_request/<string:passband_request>/<string:content_request>', methods=['GET'])
+@app.route('/pbs/unpack_request/<string:passband_request>/<string:content_request>/<string:phoebe_version_request>', methods=['GET'])
+def pbs_unpack_request(passband_request='all', content_request='all', phoebe_version_request='latest'):
+    if app._verbose:
+        print("pbs_unpack_request", passband_request, content_request)
+
+
+
+    phoebe_version_request = _unpack_version_request(phoebe_version_request)
+    passband_request = _unpack_passband_request(passband_request)
+    content_request = _unpack_content_request(content_request)
+
+    generated = {}
+    for pbr in passband_request:
+        pb = _generate_request_passband(pbr, content_request, save=False)
+        generated["{}:{}".format(pb.pbset, pb.pbname)] = pb.content
+
+    return _get_response({'phoebe_version_request': phoebe_version_request,
+                          'phoebe_version_server': phoebe.__version__,
+                          'passband_request': passband_request,
+                          'content_request': content_request,
+                          'content_generated': generated})
+
+# @app.route('/pbs', methods=['GET'])
 @app.route('/pbs/<string:passband_request>', methods=['GET'])
 @app.route('/pbs/<string:passband_request>/<string:content_request>', methods=['GET'])
 @app.route('/pbs/<string:passband_request>/<string:content_request>/<string:phoebe_version_request>', methods=['GET'])
 def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe_version_request='latest'):
     if app._verbose:
-        print("generate_and_serve_passband", passband_request, content_request)
+        print("pbs_generate_and_serve", passband_request, content_request)
 
     created_tmp_files = []
 
@@ -264,7 +292,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
         created_tmp_files.append(tbf)
 
         for pbr in passband_request:
-            pbf, pbfname = _generate_request_passband(pbr, content_request)
+            pbf, pbfname = _generate_request_passband(pbr, content_request, save=True)
             created_tmp_files.append(pbf)
 
             tar.add(pbf.name, arcname=pbfname)
@@ -272,7 +300,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
         return send_file(tbf.name, as_attachment=True, attachment_filename='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
-    pbf, pbfname = _generate_request_passband(passband_request[0], content_request)
+    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, save=True)
     created_tmp_files.append(pbf)
 
     return send_file(pbf.name, as_attachment=True, attachment_filename=pbfname)
