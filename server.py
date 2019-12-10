@@ -37,11 +37,16 @@ from datetime import datetime
 
 phoebe.interactive_off()
 
-def _pbs_flush():
-    print("flushing passbands cache")
-    phoebe.atmospheres.passbands._pbtable = {}
-    phoebe.atmospheres.passbands._init_passbands(refresh=True, query_online=False, passband_directories=datadir)
+def _pbs_flush(force=False):
+    global _pbs_last_flush
+    if _pbs_last_flush is None or force or (datetime.now()-_pbs_last_flush).total_seconds() > (60*60):
+        print("flushing passbands cache")
+        phoebe.atmospheres.passbands._pbtable = {}
+        phoebe.atmospheres.passbands._init_passbands(refresh=True, query_online=False, passband_directories=datadir)
+        _pbs_last_flush = datetime.now()
 
+global _pbs_last_flush
+_pbs_last_flush = None
 _pbs_flush()
 
 ############################ HTTP ROUTES ######################################
@@ -162,7 +167,7 @@ def info():
 
 @app.route('/pbs/flush', methods=['GET'])
 def pbs_flush():
-    _pbs_flush()
+    _pbs_flush(force=True)
     return redirect("/pbs/list")
 
 @app.route('/pbs/phoebe_versions', methods=['GET'])
@@ -175,6 +180,8 @@ def pbs_phoebe_versions():
 def pbs_list(phoebe_version_request='latest'):
     if app._verbose:
         print("list_passbands")
+
+    _pbs_flush()
 
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed'])
@@ -189,6 +196,8 @@ def pbs_list(phoebe_version_request='latest'):
 def pbs_available(phoebe_version_request='latest'):
     if app._verbose:
         print("available")
+
+    _pbs_flush()
 
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb'])
@@ -228,6 +237,8 @@ def pbs_content(passband_request, phoebe_version_request='latest'):
     if app._verbose:
         print("pbs_content for passband: {}".format(passband_request))
 
+    _pbs_flush()
+
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
 
@@ -247,7 +258,7 @@ def pbs_unpack_request(passband_request='all', content_request='all', phoebe_ver
     if app._verbose:
         print("pbs_unpack_request", passband_request, content_request)
 
-
+    _pbs_flush()
 
     phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
@@ -271,6 +282,8 @@ def pbs_unpack_request(passband_request='all', content_request='all', phoebe_ver
 def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe_version_request='latest'):
     if app._verbose:
         print("pbs_generate_and_serve", passband_request, content_request)
+
+    _pbs_flush()
 
     created_tmp_files = []
 
