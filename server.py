@@ -107,7 +107,9 @@ def _generate_request_passband(pbr, content_request):
     if app._verbose:
         print("_generate_request_passband {} {}".format(pbr, content_request))
 
-    pb = phoebe.get_passband(pbr)
+    # we have to force reloading from the file here or else changing the content
+    # will persist in memory
+    pb = phoebe.get_passband(pbr, reload=True)
 
     prefix = '{}_{}'.format(pb.pbset.lower(), pb.pbname.lower())
     filename = '{}.fits'.format(prefix)
