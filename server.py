@@ -128,7 +128,7 @@ def _generate_request_passband(pbr, content_request):
         pb.content = content_return
 
     pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
-    pb.save(pbf.name)
+    pb.save(pbf.name, update_timestamp=False)
 
     return pbf, filename
 
