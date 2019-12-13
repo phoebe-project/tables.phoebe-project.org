@@ -33,6 +33,7 @@ import sys
 import phoebe
 import tempfile
 import tarfile
+import gzip
 from datetime import datetime
 
 phoebe.interactive_off()
@@ -48,6 +49,16 @@ def _pbs_flush(force=False):
 global _pbs_last_flush
 _pbs_last_flush = None
 _pbs_flush()
+
+def _string_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    elif value.lower() == 'false':
+        return False
+    elif value.lower() == 'true':
+        return True
+    else:
+        raise ValueError("{} could not be cast to bool".format(value))
 
 ############################ HTTP ROUTES ######################################
 def _get_response(data, status_code=200):
@@ -108,16 +119,16 @@ def _unpack_version_request(phoebe_version_request):
     else:
         return phoebe_version_request
 
-def _generate_request_passband(pbr, content_request, save=True):
+def _generate_request_passband(pbr, content_request, gzipped=False, save=True):
     if app._verbose:
-        print("_generate_request_passband {} {}".format(pbr, content_request))
+        print("_generate_request_passband {} {} gzipped={} save={}".format(pbr, content_request, gzipped, save))
 
     # we have to force reloading from the file here or else changing the content
     # will persist in memory
     pb = phoebe.get_passband(pbr, reload=True)
 
     prefix = '{}_{}'.format(pb.pbset.lower(), pb.pbname.lower())
-    filename = '{}.fits'.format(prefix)
+    filename = '{}.fits.gz'.format(prefix) if gzipped else '{}.fits'.format(prefix)
 
     if isinstance(content_request, str):
         if content_request.lower() == 'all':
@@ -137,10 +148,16 @@ def _generate_request_passband(pbr, content_request, save=True):
         pb.content = content_return
 
     if save:
-        pbf = tempfile.NamedTemporaryFile(dir=tmpdir, prefix=prefix, suffix=".fits")
-        pb.save(pbf.name, update_timestamp=False)
+        pbf = tempfile.NamedTemporaryFile(mode='w+b', dir=tmpdir, prefix=prefix, suffix=".fits.gz" if gzipped else ".fits")
+        if gzipped:
+            gzf = gzip.GzipFile(mode='wb', fileobj=pbf)
+            pb.save(gzf, update_timestamp=False)
+            return gzf, filename
 
-        return pbf, filename
+        else:
+            pb.save(pbf, update_timestamp=False)
+            return pbf, filename
+
     else:
         return pb
 
@@ -176,15 +193,14 @@ def pbs_phoebe_versions():
                           'phoebe_versions_available': [phoebe.__version__, 'latest']})
 
 @app.route('/pbs/list', methods=['GET'])
-@app.route('/pbs/list/<string:phoebe_version_request>', methods=['GET'])
-def pbs_list(phoebe_version_request='latest'):
+def pbs_list():
     if app._verbose:
         print("list_passbands")
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(phoebe_version_request)
-    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed'])
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
@@ -192,15 +208,14 @@ def pbs_list(phoebe_version_request='latest'):
 
 
 @app.route('/pbs/available', methods=['GET'])
-@app.route('/pbs/available/<string:phoebe_version_request>', methods=['GET'])
-def pbs_available(phoebe_version_request='latest'):
+def pbs_available():
     if app._verbose:
         print("available")
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(phoebe_version_request)
-    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb'])
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
     available_content = []
     for pb,d in online_passbands.items():
@@ -232,17 +247,17 @@ def pbs_available(phoebe_version_request='latest'):
                           'content_atms': sorted(list(set([c.split(':')[0] for c in available_content])))})
 
 @app.route('/pbs/content/<string:passband_request>', methods=['GET'])
-@app.route('/pbs/content/<string:passband_request>/<string:phoebe_version_request>', methods=['GET'])
-def pbs_content(passband_request, phoebe_version_request='latest'):
+def pbs_content(passband_request):
     if app._verbose:
         print("pbs_content for passband: {}".format(passband_request))
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
 
-    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed'])
+
+    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
@@ -250,36 +265,36 @@ def pbs_content(passband_request, phoebe_version_request='latest'):
                           'content': {pbr: online_passbands.get(pbr, {}).get('content', []) for pbr in passband_request}})
 
 
-# @app.route('/pbs', methods=['GET'])
+# @app.route('/pbs/unpack_request', methods=['GET'])
 @app.route('/pbs/unpack_request/<string:passband_request>', methods=['GET'])
 @app.route('/pbs/unpack_request/<string:passband_request>/<string:content_request>', methods=['GET'])
-@app.route('/pbs/unpack_request/<string:passband_request>/<string:content_request>/<string:phoebe_version_request>', methods=['GET'])
-def pbs_unpack_request(passband_request='all', content_request='all', phoebe_version_request='latest'):
+def pbs_unpack_request(passband_request='all', content_request='all'):
     if app._verbose:
         print("pbs_unpack_request", passband_request, content_request)
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
     content_request = _unpack_content_request(content_request)
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    gzipped = _string_to_bool(request.args.get('gzipped', False))
 
     generated = {}
     for pbr in passband_request:
-        pb = _generate_request_passband(pbr, content_request, save=False)
+        pb = _generate_request_passband(pbr, content_request, gzipped=gzipped, save=False)
         generated["{}:{}".format(pb.pbset, pb.pbname)] = pb.content
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
                           'passband_request': passband_request,
                           'content_request': content_request,
-                          'content_generated': generated})
+                          'content_generated': generated,
+                          'content_gzipped': gzipped})
 
 # @app.route('/pbs', methods=['GET'])
 @app.route('/pbs/<string:passband_request>', methods=['GET'])
 @app.route('/pbs/<string:passband_request>/<string:content_request>', methods=['GET'])
-@app.route('/pbs/<string:passband_request>/<string:content_request>/<string:phoebe_version_request>', methods=['GET'])
-def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe_version_request='latest'):
+def pbs_generate_and_serve(passband_request='all', content_request='all',):
     if app._verbose:
         print("pbs_generate_and_serve", passband_request, content_request)
 
@@ -293,9 +308,10 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
             tf.close()
         return response
 
-    phoebe_version_request = _unpack_version_request(phoebe_version_request)
     passband_request = _unpack_passband_request(passband_request)
     content_request = _unpack_content_request(content_request)
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    gzipped = _string_to_bool(request.args.get('gzipped', False))
 
     if len(passband_request) > 1:
         # TODO: flexibility for tar vs zip?
@@ -305,7 +321,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
         created_tmp_files.append(tbf)
 
         for pbr in passband_request:
-            pbf, pbfname = _generate_request_passband(pbr, content_request, save=True)
+            pbf, pbfname = _generate_request_passband(pbr, content_request, gzipped=gzipped, save=True)
             created_tmp_files.append(pbf)
 
             tar.add(pbf.name, arcname=pbfname)
@@ -313,7 +329,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all', phoebe
         return send_file(tbf.name, as_attachment=True, attachment_filename='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
-    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, save=True)
+    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, gzipped=gzipped, save=True)
     created_tmp_files.append(pbf)
 
     return send_file(pbf.name, as_attachment=True, attachment_filename=pbfname)
