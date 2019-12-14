@@ -202,6 +202,9 @@ def pbs_list():
     phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
+    for pb,info in online_passbands.items():
+        info['fname'] = 'tables.phoebe-project.org/pbs/{}'.format(pb)
+
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
                           'passbands_list': online_passbands})
