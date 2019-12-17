@@ -172,6 +172,10 @@ def favicon():
 def redirect_to_form():
     return redirect("http://phoebe-project.org/tables", code=302)
 
+@app.route('/pbs', methods=['GET'])
+def redirect_to_form_pbs():
+    return redirect("http://phoebe-project.org/tables/pbs", code=302)
+
 @app.route('/info', methods=['GET'])
 def info():
     if app._verbose:
@@ -182,11 +186,6 @@ def info():
     return _get_response({'python_version_server': "{}.{}.{}".format(version_info.major, version_info.minor, version_info.micro),
                           'phoebe_version_server': phoebe.__version__})
 
-@app.route('/pbs/flush', methods=['GET'])
-def pbs_flush():
-    _pbs_flush(force=True)
-    return redirect("/pbs/list")
-
 @app.route('/pbs/phoebe_versions', methods=['GET'])
 def pbs_phoebe_versions():
     return _get_response({'phoebe_version_server': phoebe.__version__,
@@ -195,7 +194,7 @@ def pbs_phoebe_versions():
 @app.route('/pbs/list', methods=['GET'])
 def pbs_list():
     if app._verbose:
-        print("list_passbands")
+        print("pbs_list")
 
     _pbs_flush()
 
@@ -213,7 +212,7 @@ def pbs_list():
 @app.route('/pbs/available', methods=['GET'])
 def pbs_available():
     if app._verbose:
-        print("available")
+        print("pbs_available")
 
     _pbs_flush()
 
