@@ -31,6 +31,7 @@ os.environ["PHOEBE_ENABLE_ONLINE_PASSBANDS"] = "FALSE"
 
 import sys
 import phoebe
+from astropy.io import fits
 import tempfile
 import tarfile
 import gzip
@@ -247,6 +248,38 @@ def pbs_available():
                           'npassbands_per_set': passbands_per_set,
                           'content': sorted(available_content),
                           'content_atms': sorted(list(set([c.split(':')[0] for c in available_content])))})
+
+@app.route('/pbs/history', methods=['GET'])
+@app.route('/pbs/history/<string:passband_request>', methods=['GET'])
+def pbs_history(passband_request='all'):
+    if app._verbose:
+        print("pbs_history")
+
+    _pbs_flush()
+
+    passband_request = _unpack_passband_request(passband_request)
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
+
+    pb_history = {}
+    for pbr in passband_request:
+        pb_history[pbr] = {}
+
+        fname = online_passbands.get(pbr, {}).get('fname', None)
+        if fname is None:
+            continue
+
+        with fits.open(fname) as hdul:
+            header = hdul['primary'].header
+            try:
+                history = "".join(header['history']).split("\n")
+            except KeyError:
+                history = []
+            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.strip('/n').split(': ')[1:]) for h in history}
+
+    return _get_response({'phoebe_version_request': phoebe_version_request,
+                          'phoebe_version_server': phoebe.__version__,
+                          'passband_history': pb_history})
 
 @app.route('/pbs/content/<string:passband_request>', methods=['GET'])
 def pbs_content(passband_request):
