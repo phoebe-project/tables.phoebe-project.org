@@ -275,7 +275,7 @@ def pbs_history(passband_request='all'):
                 history = "".join(header['history']).split("-END-")
             except KeyError:
                 history = []
-            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.split(': ')[1:]) for h in history}
+            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.split(': ')[1:]) for h in history if len(h.split(': '))>1}
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
