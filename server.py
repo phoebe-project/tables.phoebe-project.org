@@ -272,10 +272,10 @@ def pbs_history(passband_request='all'):
         with fits.open(fname) as hdul:
             header = hdul['primary'].header
             try:
-                history = "".join(header['history']).split("\n")
+                history = "".join(header['history']).split("-END-")
             except KeyError:
                 history = []
-            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.strip('/n').split(': ')[1:]) for h in history}
+            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.split(': ')[1:]) for h in history}
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
