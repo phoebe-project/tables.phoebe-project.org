@@ -269,13 +269,8 @@ def pbs_history(passband_request='all'):
         if fname is None:
             continue
 
-        with fits.open(fname) as hdul:
-            header = hdul['primary'].header
-            try:
-                history = "".join(header['history']).split("-END-")
-            except KeyError:
-                history = []
-            pb_history[pbr] = {h.split(': ')[0]: ': '.join(h.split(': ')[1:]) for h in history if len(h.split(': '))>1}
+        pb = phoebe.atmospheres.passbands.Passband.load(fname, load_content=False)
+        pb_history[pbr] = pb.history
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
