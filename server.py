@@ -187,6 +187,14 @@ def info():
     return _get_response({'python_version_server': "{}.{}.{}".format(version_info.major, version_info.minor, version_info.micro),
                           'phoebe_version_server': phoebe.__version__})
 
+@app.route('/flush', methods=['GET'])
+def flush():
+    if app._verbose:
+        print("flush")
+
+    _pbs_flush(force=True)
+    return redirect('/info')
+
 @app.route('/pbs/phoebe_versions', methods=['GET'])
 def pbs_phoebe_versions():
     return _get_response({'phoebe_version_server': phoebe.__version__,
