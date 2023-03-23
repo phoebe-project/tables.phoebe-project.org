@@ -5,7 +5,7 @@ pip install flask
 """
 
 try:
-    from flask import Flask, jsonify, request, redirect, Response, make_response, send_from_directory, send_file, after_this_request
+    from flask import Flask, jsonify, request, redirect, send_file, after_this_request
     from flask_cors import CORS
 except ImportError:
     raise ImportError("dependencies not met: pip install flask flask-cors")
@@ -364,13 +364,13 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
 
             tar.add(pbf.name, arcname=pbfname)
 
-        return send_file(tbf.name, as_attachment=True, attachment_filename='generated_phoebe_tables.tar.gz')
+        return send_file(tbf.name, as_attachment=True, download_name='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
     pbf, pbfname = _generate_request_passband(passband_request[0], content_request, gzipped=gzipped, save=True)
     created_tmp_files.append(pbf)
 
-    return send_file(pbf.name, as_attachment=True, attachment_filename=pbfname)
+    return send_file(pbf.name, as_attachment=True, download_name=pbfname)
 
 
 if __name__ == "__main__":
