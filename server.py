@@ -171,11 +171,11 @@ def favicon():
 
 @app.route('/', methods=['GET'])
 def redirect_to_form():
-    return redirect("http://phoebe-project.org/tables", code=302)
+    return redirect("https://phoebe-project.org/tables", code=302)
 
 @app.route('/pbs', methods=['GET'])
 def redirect_to_form_pbs():
-    return redirect("http://phoebe-project.org/tables/pbs", code=302)
+    return redirect("https://phoebe-project.org/tables/pbs", code=302)
 
 @app.route('/info', methods=['GET'])
 def info():
@@ -207,7 +207,7 @@ def pbs_list():
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
     for pb,info in online_passbands.items():
@@ -225,7 +225,7 @@ def pbs_available():
 
     _pbs_flush()
 
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
     available_content = []
@@ -266,7 +266,7 @@ def pbs_history(passband_request='all'):
     _pbs_flush()
 
     passband_request = _unpack_passband_request(passband_request)
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
 
     pb_history = {}
@@ -278,7 +278,12 @@ def pbs_history(passband_request='all'):
             continue
 
         pb = phoebe.atmospheres.passbands.Passband.load(fname, load_content=False)
-        pb_history[pbr] = pb.history
+        # exporting a list to dict:
+        history = dict()
+        for entry in pb.history:
+            timestamp, message = entry.split(': ')
+            history[timestamp] = message
+        pb_history[pbr] = history
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,
@@ -292,7 +297,7 @@ def pbs_content(passband_request):
     _pbs_flush()
 
     passband_request = _unpack_passband_request(passband_request)
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
 
 
     online_passbands = phoebe.list_installed_passbands(full_dict=True, skip_keys=['pb', 'installed', 'local'])
@@ -314,7 +319,7 @@ def pbs_unpack_request(passband_request='all', content_request='all'):
 
     passband_request = _unpack_passband_request(passband_request)
     content_request = _unpack_content_request(content_request)
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
     gzipped = _string_to_bool(request.args.get('gzipped', False))
 
     generated = {}
@@ -348,7 +353,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
 
     passband_request = _unpack_passband_request(passband_request)
     content_request = _unpack_content_request(content_request)
-    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'lastest'))
+    phoebe_version_request = _unpack_version_request(request.args.get('phoebe_version', 'latest'))
     gzipped = _string_to_bool(request.args.get('gzipped', False))
 
     if len(passband_request) > 1:
