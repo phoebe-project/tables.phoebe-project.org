@@ -37,6 +37,7 @@ import tarfile
 import gzip
 from datetime import datetime
 from packaging import version
+import re
 
 phoebe.interactive_off()
 
@@ -77,8 +78,11 @@ def requires_inorm_tables(phoebe_version):
         True if the version is less than 2.5, False otherwise
     """
 
+    # normalize version number if necessary:
+    version_base = re.match(r'(\d+\.\d+\.\d+)', phoebe_version)
+
     try:
-        return version.parse(phoebe_version) < version.parse('2.5')
+        return version.parse(version_base) < version.parse('2.5')
     except ValueError:
         # can't parse the version, so assume it's legacy
         return True
