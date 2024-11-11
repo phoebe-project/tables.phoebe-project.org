@@ -82,7 +82,7 @@ def requires_inorm_tables(phoebe_version):
     version_base = re.match(r'(\d+\.\d+\.\d+)', phoebe_version)
 
     try:
-        return version.parse(version_base) < version.parse('2.5')
+        return version.parse(version_base.group(1)) < version.parse('2.5')
     except ValueError:
         # can't parse the version, so assume it's legacy
         return True
