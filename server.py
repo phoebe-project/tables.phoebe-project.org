@@ -121,7 +121,7 @@ def _unpack_version_request(phoebe_version_request):
     else:
         return phoebe_version_request
 
-def _generate_request_passband(pbr, content_request, export_legacy_tables=False, gzipped=False, save=True):
+def _generate_request_passband(pbr, content_request, export_inorm_tables=False, gzipped=False, save=True):
     if app._verbose:
         print("_generate_request_passband {} {} gzipped={} save={}".format(pbr, content_request, gzipped, save))
 
@@ -153,11 +153,11 @@ def _generate_request_passband(pbr, content_request, export_legacy_tables=False,
         pbf = tempfile.NamedTemporaryFile(mode='w+b', dir=tmpdir, prefix=prefix, suffix=".fits.gz" if gzipped else ".fits")
         if gzipped:
             gzf = gzip.GzipFile(mode='wb', fileobj=pbf)
-            pb.save(gzf, export_legacy_tables=export_legacy_tables, update_timestamp=False)
+            pb.save(gzf, export_inorm_tables=export_inorm_tables, update_timestamp=False)
             return gzf, filename
 
         else:
-            pb.save(pbf, export_legacy_tables=export_legacy_tables, update_timestamp=False)
+            pb.save(pbf, export_inorm_tables=export_inorm_tables, update_timestamp=False)
             return pbf, filename
 
     else:
@@ -320,8 +320,8 @@ def pbs_unpack_request(passband_request='all', content_request='all'):
 
     generated = {}
     for pbr in passband_request:
-        export_legacy_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
-        pb = _generate_request_passband(pbr, content_request, export_legacy_tables=export_legacy_tables, gzipped=gzipped, save=False)
+        export_inorm_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
+        pb = _generate_request_passband(pbr, content_request, export_inorm_tables=export_inorm_tables, gzipped=gzipped, save=False)
         generated["{}:{}".format(pb.pbset, pb.pbname)] = pb.content
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
@@ -361,8 +361,8 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         created_tmp_files.append(tbf)
 
         for pbr in passband_request:
-            export_legacy_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
-            pbf, pbfname = _generate_request_passband(pbr, content_request, export_legacy_tables=export_legacy_tables, gzipped=gzipped, save=True)
+            export_inorm_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
+            pbf, pbfname = _generate_request_passband(pbr, content_request, export_inorm_tables=export_inorm_tables, gzipped=gzipped, save=True)
             created_tmp_files.append(pbf)
 
             tar.add(pbf.name, arcname=pbfname)
@@ -370,8 +370,8 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         return send_file(tbf.name, as_attachment=True, download_name='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
-    export_legacy_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
-    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, export_legacy_tables=export_legacy_tables, gzipped=gzipped, save=True)
+    export_inorm_tables = phoebe_version_request == 'latest' or version.parse(phoebe_version_request) < version.parse('2.5')
+    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, export_inorm_tables=export_inorm_tables, gzipped=gzipped, save=True)
     created_tmp_files.append(pbf)
 
     return send_file(pbf.name, as_attachment=True, download_name=pbfname)
