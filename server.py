@@ -62,7 +62,7 @@ def _string_to_bool(value):
     else:
         raise ValueError("{} could not be cast to bool".format(value))
 
-def is_legacy(phoebe_version):
+def requires_inorm_tables(phoebe_version):
     """
     Returns True if the version is less than 2.5
     
@@ -341,7 +341,7 @@ def pbs_unpack_request(passband_request='all', content_request='all'):
 
     generated = {}
     for pbr in passband_request:
-        pb = _generate_request_passband(pbr, content_request, export_inorm_tables=is_legacy(phoebe_version_request), gzipped=gzipped, save=False)
+        pb = _generate_request_passband(pbr, content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=False)
         generated["{}:{}".format(pb.pbset, pb.pbname)] = pb.content
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
@@ -381,7 +381,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         created_tmp_files.append(tbf)
 
         for pbr in passband_request:
-            pbf, pbfname = _generate_request_passband(pbr, content_request, export_inorm_tables=is_legacy(phoebe_version_request), gzipped=gzipped, save=True)
+            pbf, pbfname = _generate_request_passband(pbr, content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=True)
             created_tmp_files.append(pbf)
 
             tar.add(pbf.name, arcname=pbfname)
@@ -389,7 +389,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         return send_file(tbf.name, as_attachment=True, download_name='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
-    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, export_inorm_tables=is_legacy(phoebe_version_request), gzipped=gzipped, save=True)
+    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=True)
     created_tmp_files.append(pbf)
 
     return send_file(pbf.name, as_attachment=True, download_name=pbfname)
