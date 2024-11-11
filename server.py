@@ -36,6 +36,8 @@ import tempfile
 import tarfile
 import gzip
 from datetime import datetime
+from packaging import version
+import re
 
 phoebe.interactive_off()
 
@@ -60,6 +62,30 @@ def _string_to_bool(value):
         return True
     else:
         raise ValueError("{} could not be cast to bool".format(value))
+
+def requires_inorm_tables(phoebe_version):
+    """
+    Returns True if the version is less than 2.5
+    
+    Arguments
+    ---------
+    phoebe_version : str
+        The version string to compare
+    
+    Returns
+    -------
+    bool
+        True if the version is less than 2.5, False otherwise
+    """
+
+    # normalize version number if necessary:
+    version_base = re.match(r'(\d+\.\d+\.\d+)', phoebe_version)
+
+    try:
+        return version.parse(version_base.group(1)) < version.parse('2.5')
+    except ValueError:
+        # can't parse the version, so assume it's legacy
+        return True
 
 ############################ HTTP ROUTES ######################################
 def _get_response(data, status_code=200):
@@ -120,7 +146,7 @@ def _unpack_version_request(phoebe_version_request):
     else:
         return phoebe_version_request
 
-def _generate_request_passband(pbr, content_request, gzipped=False, save=True):
+def _generate_request_passband(pbr, content_request, export_inorm_tables=False, gzipped=False, save=True):
     if app._verbose:
         print("_generate_request_passband {} {} gzipped={} save={}".format(pbr, content_request, gzipped, save))
 
@@ -152,11 +178,11 @@ def _generate_request_passband(pbr, content_request, gzipped=False, save=True):
         pbf = tempfile.NamedTemporaryFile(mode='w+b', dir=tmpdir, prefix=prefix, suffix=".fits.gz" if gzipped else ".fits")
         if gzipped:
             gzf = gzip.GzipFile(mode='wb', fileobj=pbf)
-            pb.save(gzf, update_timestamp=False)
+            pb.save(gzf, export_inorm_tables=export_inorm_tables, update_timestamp=False)
             return gzf, filename
 
         else:
-            pb.save(pbf, update_timestamp=False)
+            pb.save(pbf, export_inorm_tables=export_inorm_tables, update_timestamp=False)
             return pbf, filename
 
     else:
@@ -324,7 +350,7 @@ def pbs_unpack_request(passband_request='all', content_request='all'):
 
     generated = {}
     for pbr in passband_request:
-        pb = _generate_request_passband(pbr, content_request, gzipped=gzipped, save=False)
+        pb = _generate_request_passband(pbr, content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=False)
         generated["{}:{}".format(pb.pbset, pb.pbname)] = pb.content
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
@@ -364,7 +390,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         created_tmp_files.append(tbf)
 
         for pbr in passband_request:
-            pbf, pbfname = _generate_request_passband(pbr, content_request, gzipped=gzipped, save=True)
+            pbf, pbfname = _generate_request_passband(pbr, content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=True)
             created_tmp_files.append(pbf)
 
             tar.add(pbf.name, arcname=pbfname)
@@ -372,7 +398,7 @@ def pbs_generate_and_serve(passband_request='all', content_request='all',):
         return send_file(tbf.name, as_attachment=True, download_name='generated_phoebe_tables.tar.gz')
 
     # if we're here, then we know we're a list with only one entry
-    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, gzipped=gzipped, save=True)
+    pbf, pbfname = _generate_request_passband(passband_request[0], content_request, export_inorm_tables=requires_inorm_tables(phoebe_version_request), gzipped=gzipped, save=True)
     created_tmp_files.append(pbf)
 
     return send_file(pbf.name, as_attachment=True, download_name=pbfname)
