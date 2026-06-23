@@ -16,6 +16,14 @@ app = Flask(__name__)
 CORS(app)
 app._verbose = True
 
+class VersionRedirect(Exception):
+    def __init__(self, url):
+        self.url = url
+
+@app.errorhandler(VersionRedirect)
+def handle_version_redirect(e):
+    return redirect(e.url, 302)
+
 import os
 pwd = os.path.dirname(os.path.abspath(__file__))
 tmpdir = os.path.join(pwd, 'flask_server_generated_tables')
@@ -38,6 +46,9 @@ import gzip
 from datetime import datetime
 from packaging import version
 import re
+
+phoebe_version_server = phoebe.__version__
+phoebe_version_latest = '2.4'  # TODO: update this on new phoebe release or retrieve dynamically from website/GH/pip
 
 phoebe.interactive_off()
 
@@ -86,6 +97,26 @@ def requires_inorm_tables(phoebe_version):
     except ValueError:
         # can't parse the version, so assume it's legacy
         return True
+
+def tables_subdomain(phoebe_version):
+    """
+    Returns the subdomain for the given phoebe version.
+    
+    Arguments
+    ---------
+    phoebe_version : str
+        The version string to compare
+    
+    Returns
+    -------
+    str
+        The subdomain for the given phoebe version
+    """
+
+    if version.parse(phoebe_version) < version.parse('2.5'):
+        return 'tables-20-24.phoebe-project.org'
+    else:
+        return 'tables.phoebe-project.org'
 
 ############################ HTTP ROUTES ######################################
 def _get_response(data, status_code=200):
@@ -142,9 +173,15 @@ def _expand_content_item(pb, cr_item):
 
 def _unpack_version_request(phoebe_version_request):
     if phoebe_version_request == 'latest':
-        return phoebe.__version__
-    else:
-        return phoebe_version_request
+        phoebe_version_request = phoebe_version_latest
+
+    subdomain_request = tables_subdomain(phoebe_version_request)
+
+    if subdomain_request != tables_subdomain(phoebe_version_server):
+        full_path = request.full_path.rstrip('?')
+        raise VersionRedirect(f"https://{subdomain_request}{full_path}")
+
+    return phoebe_version_request
 
 def _generate_request_passband(pbr, content_request, export_inorm_tables=False, gzipped=False, save=True):
     if app._verbose:
@@ -206,12 +243,12 @@ def redirect_to_form_pbs():
 @app.route('/info', methods=['GET'])
 def info():
     if app._verbose:
-        print("info", sys.version_info, phoebe.__version__)
+        print("info", sys.version_info, phoebe_version_server)
 
     version_info = sys.version_info
 
     return _get_response({'python_version_server': "{}.{}.{}".format(version_info.major, version_info.minor, version_info.micro),
-                          'phoebe_version_server': phoebe.__version__})
+                          'phoebe_version_server': phoebe_version_server})
 
 @app.route('/flush', methods=['GET'])
 def flush():
