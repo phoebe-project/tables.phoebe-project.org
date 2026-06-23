@@ -43,25 +43,40 @@ from astropy.io import fits
 import tempfile
 import tarfile
 import gzip
+import urllib.request
+import json
 from datetime import datetime
 from packaging import version
 import re
 
 phoebe_version_server = phoebe.__version__
-phoebe_version_latest = '2.4'  # TODO: update this on new phoebe release or retrieve dynamically from website/GH/pip
-
 phoebe.interactive_off()
 
+def _get_phoebe_version_latest():
+    global _phoebe_version_latest_cache
+    if _phoebe_version_latest_cache is None:
+        try:
+            with urllib.request.urlopen('https://pypi.org/pypi/phoebe/json', timeout=3) as r:
+                _phoebe_version_latest_cache = json.loads(r.read())['info']['version']
+        except Exception:
+            return '2.4'  # hardcoded fallback if PyPI unreachable
+    return _phoebe_version_latest_cache
+
+
 def _pbs_flush(force=False):
-    global _pbs_last_flush
+    global _pbs_last_flush, _phoebe_version_latest_cache
     if _pbs_last_flush is None or force or (datetime.now()-_pbs_last_flush).total_seconds() > (60*60):
         print("flushing passbands cache")
         phoebe.atmospheres.passbands._pbtable = {}
         phoebe.atmospheres.passbands._init_passbands(refresh=True, query_online=False, passband_directories=datadir)
+        _phoebe_version_latest_cache = None
         _pbs_last_flush = datetime.now()
+
 
 global _pbs_last_flush
 _pbs_last_flush = None
+global _phoebe_version_latest_cache
+_phoebe_version_latest_cache = None
 _pbs_flush()
 
 def _string_to_bool(value):
@@ -173,7 +188,7 @@ def _expand_content_item(pb, cr_item):
 
 def _unpack_version_request(phoebe_version_request):
     if phoebe_version_request == 'latest':
-        phoebe_version_request = phoebe_version_latest
+        phoebe_version_request = _get_phoebe_version_latest()
 
     subdomain_request = tables_subdomain(phoebe_version_request)
 
