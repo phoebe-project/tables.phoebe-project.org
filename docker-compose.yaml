@@ -3,26 +3,31 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        mem_limit: 6g
         image: phoebe-tables:latest
+        pull_policy: never
         container_name: phoebe-tables-server
         ports:
-            - "5600:5600"
+            - "${HOST_IP}:${HOST_PORT}:80"
         volumes:
             - ./data:/tables/data:ro
+        deploy:
+            resources:
+                limits:
+                    memory: ${MEMORY_LIMIT}
         environment:
-            FLASK_ENV: production
+            PHOEBE_ENABLE_ONLINE_PASSBANDS: FALSE
+            FLASK_DEBUG: "0"
             LOG_LEVEL: info
             GUNICORN_CMD_ARGS: >-
-                --workers 1
-                --threads 4
-                --worker-class gthread
-                --timeout 600
-                --graceful-timeout 600
+                --workers 2
+                --worker-class sync
+                --timeout 120
+                --graceful-timeout 120
                 --keep-alive 60
-                --max-requests 400
-                --max-requests-jitter 80
+                --max-requests 1000
+                --max-requests-jitter 10
                 --log-level info
                 --access-logfile -
                 --error-logfile -
         restart: unless-stopped
+

@@ -1,5 +1,6 @@
-FROM python:3-alpine
+FROM python:3.12-alpine
 
+ARG GIT_REMOTE=phoebe-project
 ARG PHOEBE_BRANCH=feature-blending
 
 RUN apk add --no-cache \
@@ -8,7 +9,7 @@ RUN apk add --no-cache \
       musl-dev
 
 RUN git clone --branch ${PHOEBE_BRANCH} --single-branch --depth 1 \
-      https://github.com/phoebe-project/phoebe2.git /phoebe
+      https://github.com/${GIT_REMOTE}/phoebe2.git /phoebe
 
 WORKDIR /phoebe
 
