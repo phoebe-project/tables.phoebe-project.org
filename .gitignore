@@ -1,3 +1,4 @@
-flask_server_generated_tables/*
-data/*
+flask_server_generated_tables
+data
 .env
+.claude
