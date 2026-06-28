@@ -1,0 +1,23 @@
+FROM python:3.12-alpine
+
+ARG GIT_REMOTE=phoebe-project
+ARG PHOEBE_BRANCH=2.4.22
+
+RUN apk add --no-cache \
+      git \
+      build-base \
+      musl-dev
+
+RUN git clone --branch ${PHOEBE_BRANCH} --single-branch --depth 1 \
+      https://github.com/${GIT_REMOTE}/phoebe2.git /phoebe
+
+WORKDIR /phoebe
+
+RUN pip install --upgrade pip
+
+RUN pip install --no-cache-dir .
+
+RUN mkdir -p /workspace
+WORKDIR /workspace
+
+ENTRYPOINT ["python", "-c", "import sys, phoebe; print(f'Python {sys.version}\\nPHOEBE {phoebe.__version__}')"]
