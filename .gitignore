@@ -1,2 +1,12 @@
-flask_server_generated_tables/*
-data/*
+# version-specific passband data: large binaries, populated out of band
+/data/2.4/*
+/data/2.5/*
+!/data/2.4/.gitkeep
+!/data/2.5/.gitkeep
+
+# server scratch dir created at runtime
+**/flask_server_generated_tables/
+
+# python
+__pycache__/
+*.pyc
