@@ -154,12 +154,12 @@ def _generate_request_passband(pbr, content_request, gzipped=False, save=True):
         pbf = tempfile.NamedTemporaryFile(mode='w+b', dir=tmpdir, prefix=prefix, suffix=".fits.gz" if gzipped else ".fits")
         if gzipped:
             gzf = gzip.GzipFile(mode='wb', fileobj=pbf)
-            pb.save(gzf, export_to_pre25=True, update_timestamp=False)
+            pb.save(gzf, update_timestamp=False)
             gzf.close()
             return pbf, filename
 
         else:
-            pb.save(pbf, export_to_pre25=True, update_timestamp=False)
+            pb.save(pbf, update_timestamp=False)
             return pbf, filename
 
     else:
@@ -289,13 +289,17 @@ def pbs_history(passband_request='all'):
             continue
 
         pb = phoebe.atmospheres.passbands.Passband.load(fname, load_content=False)
-        # exporting a list to dict:
-        # history = dict()
-        # for entry in pb.history:
-        # print(f'{entry=}')
-        # timestamp, message = entry.split(': ')
-        # history[timestamp] = message
-        pb_history[pbr] = pb.history
+
+        if type(pb.history) is list:
+            history = dict()
+            for entry in pb.history:
+                timestamp, message = entry.split(': ')
+                history[timestamp] = message
+            pb_history[pbr] = history
+        elif type(pb.history) is dict:
+            pb_history[pbr] = pb.history
+        else:
+            raise TypeError(f'passband history must be a list or a string, not a {type(pb.history)}.')
 
     return _get_response({'phoebe_version_request': phoebe_version_request,
                           'phoebe_version_server': phoebe.__version__,

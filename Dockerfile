@@ -1,4 +1,4 @@
-FROM phoebe:2.4.23-blending
+FROM phoebe:2.4.22
 
 RUN pip install --no-cache-dir flask flask-cors gunicorn
 

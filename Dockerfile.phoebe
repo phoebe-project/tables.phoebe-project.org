@@ -1,7 +1,7 @@
 FROM python:3.12-alpine
 
 ARG GIT_REMOTE=phoebe-project
-ARG PHOEBE_BRANCH=feature-blending
+ARG PHOEBE_BRANCH=2.4.22
 
 RUN apk add --no-cache \
       git \

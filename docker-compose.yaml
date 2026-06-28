@@ -3,9 +3,10 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        image: phoebe-tables:latest
+            no_cache: true
+        image: phoebe-tables:${SERVER_VERSION}
         pull_policy: never
-        container_name: phoebe-tables-server
+        container_name: phoebe-tables-server-${SERVER_VERSION}
         ports:
             - "${HOST_IP}:${HOST_PORT}:80"
         volumes:
